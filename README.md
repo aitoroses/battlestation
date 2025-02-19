@@ -1,31 +1,112 @@
-# Seedtag - Go Backend Engineer - Code test
+# Endor Battle Station
 
 ![AllianceStarbird](assets/alliance-logo.png)
 
-# Mission
+A sophisticated battle station targeting system built in Go that manages ion cannon operations and target selection for the Rebel Alliance.
 
-Beloved **General Lando Calrissian**,
+## Overview
 
-We appreciate your work and leadership through the crucial victory in the Battle of Endor. It is vital that we keep control over the moon and its surroundings, and you have been selected for your skills in weaponry. We need your help to finish the new rebel battle station which still lacks the targeting and ion cannon management systems.
+The Endor Battle Station is a high-performance targeting system that:
 
-The new _Endor Battle Station_ modules have a sophisticated communication system between them via **HTTP APIs**.
+- Processes radar scans from probe droids
+- Applies complex targeting protocols
+- Manages multiple ion cannons
+- Executes coordinated attacks
+- Provides real-time attack reporting
 
-The mission's objective is to develop an **HTTP endpoint** that receives radar scans from our stolen probe droids as **JSON** data, determines the appropriate target to destroy, chooses and fires the best available ion cannon among the ones placed around the moon and returns a **JSON** response with the damage inflicted.
+## Architecture
 
-Our stolen and repurposed viper probe droids deployed around the surrounding moons and planets are constantly finding new hidden ships and targets to attack. Once available the probe droids send their radar scans to the _Endor Battle Station_ along with some key information from our leaders with a **POST** request to an `/attack` endpoint.
+The system uses a hexagonal architecture (ports & adapters) with the following key components:
 
-![ProbeDroid](assets/probe-droid.png)
+```
+/
+├── cmd/
+│   └── battlestation/          # Main application entry point
+├── internal/
+│   ├── domain/                 # Core business logic
+│   │   ├── target/            # Target selection logic
+│   │   ├── protocol/          # Protocol implementations
+│   │   ├── cannon/            # Ion cannon management
+│   │   └── attack/            # Attack coordination
+│   └── platform/              # External dependencies
+│       ├── http/             # HTTP server & client
+│       └── metrics/          # Performance monitoring
+└── tests/                     # Integration tests
+```
 
-The battle station module you will develop should process the attack request and follow the next steps:
+### Key Features
 
-1. Find the next target to destroy
-2. Find the best available ion cannon
-3. Fire the chosen ion cannon to destroy the target
-4. Report back on the damage inflicted and the ion cannon used
+1. **Protocol Chain Processing**
 
-## 1. Find next target
+   - Implements Chain of Responsibility pattern
+   - Supports multiple simultaneous protocols
+   - Efficient target filtering and prioritization
+   - Handles edge cases gracefully
 
-The probe droid radar scans are as follows:
+2. **Ion Cannon Management**
+
+   - Priority-based cannon selection
+   - Real-time availability tracking
+   - Performance optimizations with caching
+   - Concurrent operation support
+
+3. **Performance Monitoring**
+   - Prometheus metrics integration
+   - Grafana dashboards
+   - Response time tracking
+   - System health monitoring
+
+## Getting Started
+
+### Prerequisites
+
+- Docker and Docker Compose
+- Go 1.22 or later (for local development)
+- Make (optional, for using Makefile commands)
+
+### Running the System
+
+1. Clone the repository:
+
+   ```bash
+   git clone <repository-url>
+   cd battlestation-codetest
+   ```
+
+2. Start the system using Docker Compose:
+
+   ```bash
+   docker-compose up -d
+   ```
+
+3. The battle station API will be available at `http://localhost:8080`
+
+### Development
+
+1. Install dependencies:
+
+   ```bash
+   go mod download
+   ```
+
+2. Run tests:
+
+   ```bash
+   make test
+   ```
+
+3. Run integration tests:
+   ```bash
+   ./tests.sh
+   ```
+
+## API Documentation
+
+### Attack Endpoint
+
+POST `/attack`
+
+Request body:
 
 ```json
 {
@@ -39,88 +120,7 @@ The probe droid radar scans are as follows:
 }
 ```
 
-- **`protocols`:** Protocol or list of protocols to be used to determine which of the following points should be attacked first.
-- **`scan`:** List of extracted points from the droid’s vision module. It's an array of points with the number of targets in that position. It has the following sub-values:
-  - **`coordinates`:** Coordinates `x` and `y` of the point.
-  - **`enemies`:** Enemy type `type` and number `number`. The suitable values for the type are **soldier** and **mech**.
-  - (optional) **`allies`:** Number of allies on the position. If not present, means that no allies in the zone.
-
-To determine the next target to destroy, you must follow the rules for each of the requested protocols:
-
-- **closest-enemies**: prioritize closest enemy point.
-- **furthest-enemies** : prioritize furthest enemy point.
-- **assist-allies** : prioritize enemy points with allies.
-- **avoid-crossfire** : do not attack enemy points with allies.
-- **prioritize-mech**: attach **mech** enemies if found. Otherwise, any other enemy type is valid.
-- **avoid-mech**: do not attack any **mech** enemies.
-
-<aside>
-⚠️ It's important to mention that several protocols could be provided in the request.
-
-</aside>
-
-As an example, if we receive the protocols **closest-enemies** and **assist-allies**, we should choose the closest point having allies present.
-
-The protocols that will be supplied in the call will always be compatible with each other. You can assume that the module will not receive the protocols **closest-enemies** and **furthest-enemies** in the same request.
-
-Finally, it's important to note that targets above a distance of **100km** are considered too far to be attacked and should be ignored.
-
-## 2. Find best available Ion Cannon
-
-After you have found the target you must attack using one of the available ion cannons.
-
-There are currently 3 fully operational ion cannons placed around the moon of _Endor._ Each one belongs to a different era and has a different fire time:
-
-- **Ion Cannon 1**: 1st Generation, Fire Time 3.5s
-- **Ion Cannon 2**: 2nd Generation, Fire Time 1.5s
-- **Ion Cannon 3**: 3rd Generation, Fire Time 2.5s
-
-![IonCannon](assets/ion-cannon.png)
-
-After an ion cannon is fired, it becomes unavailable for a period of time equal to its fire time. For example, if the **Ion Cannon 1** is fired, it will be unavailable for 3.5 seconds.
-
-The probe droids however will keep requesting new targets to be attacked at a rate of **1 request per second**, which means you'll have to use all ion cannons to keep up with the requests.
-
-**The lowest generation ion cannons should be prioritized.** If they are all available the station should fire the 1st Generation cannon, followed by the 2nd and third.
-
-🔧 To help you with this task, each ion cannon contains a **HTTP GET** `/status` endpoint that returns its current state. The response is a JSON object with the following structure:
-
-```json
-{
-  "generation": 1,
-  "available": true
-}
-```
-
-_You must utilize this status to determine which ion cannon is available_ to fire at the target as sometimes these cannons might overload and cause additional downtime.
-
-Remember we want to be able to **attack the target as fast as possible upon receiving a request**.
-
-## 3. Fire the Ion Cannon
-
-Once the best available ion-cannon is chosen, it must be fired to destroy the target.
-
-To fire the ion cannon, you must send a **HTTP POST** request to the `/fire` endpoint with the following **JSON** payload body:
-
-```json
-{
-  "target": { "x": 0, "y": 40 },
-  "enemies": 1
-}
-```
-
-The cannon will then return a JSON response with the damage inflicted and the generation it belongs to:
-
-```json
-{
-  "casualties": 1,
-  "generation": 1
-}
-```
-
-## 4. Report
-
-The response of the _Endor Battle Station_ `/attack` endpoint should be a **JSON** object with the following structure:
+Response:
 
 ```json
 {
@@ -130,24 +130,56 @@ The response of the _Endor Battle Station_ `/attack` endpoint should be a **JSON
 }
 ```
 
-This will allow the probe droids to report back to the leaders managing them and keeping track of the usefulness of ion cannons in _Endor_.
+## Supported Protocols
 
----
+- **closest-enemies**: Prioritize closest enemy point
+- **furthest-enemies**: Prioritize furthest enemy point
+- **assist-allies**: Prioritize enemy points with allies
+- **avoid-crossfire**: Do not attack enemy points with allies
+- **prioritize-mech**: Attack mech enemies if found
+- **avoid-mech**: Do not attack any mech enemies
 
-# Additional Considerations
+## Monitoring
 
-It is essential the attack module for the _Endor Battle Station_ be written in **Go** and developed using a **docker environment** with docker-compose so that the local _Ewoks_ can further test it and maintain it after you are gone.
+The system includes Grafana dashboards for monitoring:
 
-Moreover, our intelligence forces obtain new information and strategies every day, so it's fundamental that the generated code is easy maintainable and extensible. To do that, good practices and some **testing** should be applied.
+- Ion cannon availability
+- Request latency
+- Attack success rates
+- System metrics
 
-Because of the importance of the mission for the New Republic, we have provided an initial docker-compose with the simulated ion cannons along with several test cases that will at least verify that the algorithm works correctly.
+Access Grafana at `http://localhost:3000`
 
-These tests are timed using the same request per second rate as the probe droids. If the response time is too slow, the battle station will not be able to destroy all targets in time.
+## Architecture Decisions
 
-You should have `curl` installed and run the command `./tests.sh` in your machine.
+The project includes detailed Architecture Decision Records (ADRs):
 
-# Delivery
+- [ADR-001](docs/ADR-001-architecture.md): Overall Architecture Design
+- [ADR-002](docs/ADR-002-target-selection.md): Target Selection Strategy
+- [ADR-003](docs/ADR-003-ion-cannon.md): Ion Cannon Management
 
-After completing the mission, push your solution to this repository.
+## Testing
 
-Good luck, **may the Force be with you.**
+The system includes:
+
+- Unit tests for all components
+- Integration tests using test cases
+- Performance tests
+- Mock implementations for external dependencies
+
+Run the test suite:
+
+```bash
+make test
+```
+
+## Contributing
+
+1. Follow Go best practices and idioms
+2. Ensure tests pass
+3. Update documentation as needed
+4. Use conventional commits
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
