@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "3000:8080"
     depends_on:
       - ion-cannon-1
       - ion-cannon-2
@@ -15,7 +15,9 @@ services:
       - battlenet
 
   ion-cannon-1:
-    image: seedtagtest/ion-cannon:latest
+    build:
+      context: .
+      dockerfile: cmd/mock-ion-cannon/Dockerfile
     environment:
       - GENERATION=1
       - FIRE_TIME=3.5
@@ -25,7 +27,9 @@ services:
       - battlenet
 
   ion-cannon-2:
-    image: seedtagtest/ion-cannon:latest
+    build:
+      context: .
+      dockerfile: cmd/mock-ion-cannon/Dockerfile
     environment:
       - GENERATION=2
       - FIRE_TIME=1.5
@@ -35,7 +39,9 @@ services:
       - battlenet
 
   ion-cannon-3:
-    image: seedtagtest/ion-cannon:latest
+    build:
+      context: .
+      dockerfile: cmd/mock-ion-cannon/Dockerfile
     environment:
       - GENERATION=3
       - FIRE_TIME=2.5
