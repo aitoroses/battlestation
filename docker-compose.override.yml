@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  battlestation:
+    build:
+      target: dev
+    volumes:
+      - .:/app
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GO_ENV=development
+      - WATCH=true
+    command: ["air", "-c", ".air.toml"]
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    networks:
+      - battlenet
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    volumes:
+      - ./deployments/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./deployments/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3001:3000"
+    networks:
+      - battlenet
+
+volumes:
+  go-mod-cache:
