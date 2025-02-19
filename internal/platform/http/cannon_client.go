@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path"
+	"net/url"
 	"time"
 
 	"github.com/aitoroses/battlestation-codetest/internal/domain/cannon"
@@ -32,10 +32,15 @@ func NewCannonClient(timeout time.Duration) *CannonClient {
 // GetStatus retrieves the current status of an ion cannon
 func (c *CannonClient) GetStatus(ctx context.Context, baseURL string) (*cannon.Status, error) {
 	// Create request with context
+	statusURL, err := url.JoinPath(baseURL, "status")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create status URL: %w", err)
+	}
+
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
-		path.Join(baseURL, "status"),
+		statusURL,
 		nil,
 	)
 	if err != nil {
@@ -81,10 +86,15 @@ func (c *CannonClient) Fire(ctx context.Context, baseURL string, req *cannon.Fir
 	}
 
 	// Create request with context
+	fireURL, err := url.JoinPath(baseURL, "fire")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create fire URL: %w", err)
+	}
+
 	httpReq, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
-		path.Join(baseURL, "fire"),
+		fireURL,
 		bytes.NewReader(body),
 	)
 	if err != nil {

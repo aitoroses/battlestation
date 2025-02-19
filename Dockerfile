@@ -20,8 +20,13 @@ FROM golang:1.22-alpine AS dev
 
 WORKDIR /app
 
-# Install Air for hot reload
-RUN go install github.com/cosmtrek/air@latest
+# Install Air and required packages
+RUN apk add --no-cache git curl && \
+    go install github.com/cosmtrek/air@v1.49.0 && \
+    go install github.com/go-delve/delve/cmd/dlv@latest
+
+# Add air binary to PATH
+ENV PATH="/go/bin:${PATH}"
 
 # Copy go mod files
 COPY go.mod ./
