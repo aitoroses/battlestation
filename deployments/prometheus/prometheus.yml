@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'battlestation'
+    static_configs:
+      - targets: ['battlestation:8080']
+    metrics_path: '/metrics'
+    scheme: 'http'
+
+  - job_name: 'ion-cannons'
+    static_configs:
+      - targets:
+        - 'ion-cannon-1:8080'
+        - 'ion-cannon-2:8080'
+        - 'ion-cannon-3:8080'
+    metrics_path: '/metrics'
+    scheme: 'http'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

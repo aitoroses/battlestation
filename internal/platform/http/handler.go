@@ -6,21 +6,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/aitoroses/battlestation-codetest/internal/domain/attack"
+	"github.com/aitoroses/battlestation-codetest/internal/platform/metrics"
 )
 
 // Handler handles HTTP requests for the battle station
 type Handler struct {
 	coordinator *attack.Coordinator
-	logger      *log.Logger
+	logger      *slog.Logger
 }
 
 // NewHandler creates a new HTTP handler
-func NewHandler(coordinator *attack.Coordinator, logger *log.Logger) *Handler {
+func NewHandler(coordinator *attack.Coordinator, logger *slog.Logger) *Handler {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &Handler{
 		coordinator: coordinator,
 		logger:      logger,
@@ -36,6 +40,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 func (h *Handler) handleAttack(w http.ResponseWriter, r *http.Request) {
 	// Set response headers
 	w.Header().Set("Content-Type", "application/json")
+
+	// Start request timing
+	start := time.Now()
 
 	// Read request body
 	body, err := io.ReadAll(r.Body)
@@ -61,13 +68,26 @@ func (h *Handler) handleAttack(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Process attack
-	start := time.Now()
 	resp, err := h.coordinator.ProcessAttack(ctx, &req)
 	duration := time.Since(start)
 
+	// Record metrics
+	for _, protocol := range req.Protocols {
+		metrics.RecordRequestDuration(protocol, duration.Seconds())
+		if err != nil {
+			metrics.RecordRequestComplete(protocol, "error")
+		} else {
+			metrics.RecordRequestComplete(protocol, "success")
+		}
+	}
+
 	// Log request details
-	h.logger.Printf("Attack request processed in %v - Protocols: %v, Targets: %d, Error: %v",
-		duration, req.Protocols, len(req.Scan), err)
+	h.logger.Info("Attack request processed",
+		slog.Duration("duration", duration),
+		slog.Any("protocols", req.Protocols),
+		slog.Int("targets", len(req.Scan)),
+		slog.Any("error", err),
+	)
 
 	if err != nil {
 		// Determine appropriate status code based on error
@@ -78,7 +98,9 @@ func (h *Handler) handleAttack(w http.ResponseWriter, r *http.Request) {
 
 	// Write successful response
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		h.logger.Printf("Failed to write response: %v", err)
+		h.logger.Error("Failed to write response",
+			slog.String("error", err.Error()),
+		)
 	}
 }
 
@@ -90,8 +112,18 @@ func (h *Handler) writeError(w http.ResponseWriter, err error, statusCode int) {
 	}{
 		Error: err.Error(),
 	}
+
+	h.logger.Error("Request error",
+		slog.String("error", err.Error()),
+		slog.Int("status_code", statusCode),
+	)
+
+	metrics.RecordError("http", err.Error())
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		h.logger.Printf("Failed to write error response: %v", err)
+		h.logger.Error("Failed to write error response",
+			slog.String("error", err.Error()),
+		)
 	}
 }
 
